@@ -1,0 +1,33 @@
+{
+  "port": 8088,
+  "mode": "debug",
+  "mysqlDsn": "root:root@tcp(127.0.0.1:3306)/lumor_puls?charset=utf8mb4&parseTime=True&loc=Local",
+  "scheduler": {
+    "enabled": true,
+    "tickSec": 60
+  },
+  "browser": {
+    "bin": "agent-browser",
+    "timeoutSec": 120,
+    "waitNetworkIdle": true
+  },
+  "llm": {
+    "enabled": true,
+    "baseUrl": "https://api.openai.com/v1",
+    "apiKey": "",
+    "model": "gpt-4o-mini",
+    "timeoutSec": 90
+  },
+  "prompts": {
+    "diffPath": "prompts/diff.txt"
+  },
+  "seedTasks": [
+    {
+      "id": "openai_pricing",
+      "url": "https://openai.com/api/pricing/",
+      "interval": "6h",
+      "type": "browser_snapshot",
+      "enabled": true
+    }
+  ]
+}
