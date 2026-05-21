@@ -8,8 +8,9 @@
   },
   "browser": {
     "bin": "agent-browser",
+    "executablePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "timeoutSec": 120,
-    "waitNetworkIdle": true
+    "waitNetworkIdle": false
   },
   "llm": {
     "enabled": true,

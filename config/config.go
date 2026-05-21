@@ -27,6 +27,7 @@ type SchedulerConfig struct {
 
 type BrowserConfig struct {
 	Bin             string `json:"bin"`
+	ExecutablePath  string `json:"executablePath"`
 	TimeoutSec      int    `json:"timeoutSec"`
 	WaitNetworkIdle bool   `json:"waitNetworkIdle"`
 }

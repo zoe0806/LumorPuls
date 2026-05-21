@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -32,15 +34,22 @@ func (b *Browser) Capture(ctx context.Context, taskID, url string) (*types.Captu
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	log.Printf("browser: open session=%s url=%s (timeout=%s)", session, url, timeout)
 	if err := b.run(runCtx, session, "open", url); err != nil {
 		return nil, fmt.Errorf("open: %w", err)
 	}
 	defer func() { _ = b.run(context.Background(), session, "close") }()
 
+	// networkidle on SPAs (OpenAI etc.) often never fires — use fixed wait by default.
 	if b.cfg.WaitNetworkIdle {
-		_ = b.run(runCtx, session, "wait", "--load", "networkidle")
+		log.Printf("browser: wait networkidle (may hang on heavy sites; prefer waitNetworkIdle=false)")
+		if err := b.run(runCtx, session, "wait", "--load", "networkidle"); err != nil {
+			log.Printf("browser: networkidle failed, fallback wait 8s: %v", err)
+			_ = b.run(runCtx, session, "wait", "8000")
+		}
 	} else {
-		_ = b.run(runCtx, session, "wait", "3000")
+		log.Printf("browser: wait 8s for render")
+		_ = b.run(runCtx, session, "wait", "8000")
 	}
 
 	title, err := b.getString(runCtx, session, "get", "title")
@@ -51,10 +60,12 @@ func (b *Browser) Capture(ctx context.Context, taskID, url string) (*types.Captu
 	if err != nil {
 		pageURL = url
 	}
+	log.Printf("browser: extract text")
 	text, err := b.evalText(runCtx, session)
 	if err != nil {
 		return nil, fmt.Errorf("extract text: %w", err)
 	}
+	log.Printf("browser: done text_len=%d", len(text))
 	text = normalizeText(text)
 	if len(text) > 120000 {
 		text = text[:120000]
@@ -75,6 +86,7 @@ func (b *Browser) run(ctx context.Context, session string, args ...string) error
 	}
 	full := append([]string{"--session", session}, args...)
 	cmd := exec.CommandContext(ctx, bin, full...)
+	cmd.Env = browserEnv(b.cfg)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -96,11 +108,8 @@ func (b *Browser) getString(ctx context.Context, session string, args ...string)
 }
 
 func (b *Browser) evalText(ctx context.Context, session string) (string, error) {
-	script := `(function(){
-		var b=document.body;
-		if(!b)return '';
-		return (b.innerText||b.textContent||'').replace(/\s+/g,' ').trim();
-	})()`
+	// Single-line only: multiline scripts break on Windows argv quoting.
+	script := `document.body?document.body.innerText:''`
 	out, err := b.runOutput(ctx, session, "eval", script, "--json")
 	if err != nil {
 		return "", err
@@ -115,6 +124,7 @@ func (b *Browser) runOutput(ctx context.Context, session string, args ...string)
 	}
 	full := append([]string{"--session", session}, args...)
 	cmd := exec.CommandContext(ctx, bin, full...)
+	cmd.Env = browserEnv(b.cfg)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -155,4 +165,17 @@ func parseCLIJSONValue(raw []byte) string {
 func normalizeText(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	return strings.TrimSpace(s)
+}
+
+// browserEnv passes AGENT_BROWSER_EXECUTABLE_PATH so install can be skipped when using system Chrome.
+func browserEnv(cfg config.BrowserConfig) []string {
+	env := os.Environ()
+	path := cfg.ExecutablePath
+	if path == "" {
+		path = os.Getenv("AGENT_BROWSER_EXECUTABLE_PATH")
+	}
+	if path != "" {
+		env = append(env, "AGENT_BROWSER_EXECUTABLE_PATH="+path)
+	}
+	return env
 }
