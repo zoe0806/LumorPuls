@@ -18,23 +18,6 @@ func NewStore(db *gorm.DB) *Store {
 	return &Store{db: db}
 }
 
-// SeedTasks inserts config seed tasks when missing.
-func (s *Store) SeedTasks(seeds []types.MonitorTask) error {
-	for _, t := range seeds {
-		var n int64
-		if err := s.db.Model(&types.MonitorTask{}).Where("id = ?", t.ID).Count(&n).Error; err != nil {
-			return err
-		}
-		if n > 0 {
-			continue
-		}
-		if err := s.db.Create(&t).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // ListTasks returns all monitor tasks.
 func (s *Store) ListTasks() ([]types.MonitorTask, error) {
 	var list []types.MonitorTask

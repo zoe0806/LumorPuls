@@ -8,12 +8,11 @@
   },
   "browser": {
     "bin": "agent-browser",
-    "executablePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "executablePath": "",
     "timeoutSec": 120,
     "waitNetworkIdle": false
   },
   "llm": {
-    "enabled": true,
     "baseUrl": "https://api.openai.com/v1",
     "apiKey": "",
     "model": "gpt-4o-mini",
@@ -21,14 +20,5 @@
   },
   "prompts": {
     "diffPath": "prompts/diff.txt"
-  },
-  "seedTasks": [
-    {
-      "id": "openai_pricing",
-      "url": "https://openai.com/api/pricing/",
-      "interval": "6h",
-      "type": "browser_snapshot",
-      "enabled": true
-    }
-  ]
+  }
 }

@@ -16,8 +16,7 @@ type Config struct {
 	Scheduler SchedulerConfig  `json:"scheduler"`
 	Browser   BrowserConfig    `json:"browser"`
 	LLM       LLMConfig        `json:"llm"`
-	Prompts   PromptsConfig    `json:"prompts"`
-	SeedTasks []SeedTaskConfig `json:"seedTasks"`
+	Prompts PromptsConfig `json:"prompts"`
 }
 
 type SchedulerConfig struct {
@@ -41,14 +40,6 @@ type LLMConfig struct {
 
 type PromptsConfig struct {
 	DiffPath string `json:"diffPath"`
-}
-
-type SeedTaskConfig struct {
-	ID       string `json:"id"`
-	URL      string `json:"url"`
-	Interval string `json:"interval"`
-	Type     string `json:"type"`
-	Enabled  bool   `json:"enabled"`
 }
 
 var (

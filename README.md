@@ -4,7 +4,11 @@
 
 ## 前置
 
-1. **MySQL**：创建库（或执行 `scripts/init_db.sql`）
+1. **MySQL**：创建库 → `go run .` 一次（建表）→ 导入任务：
+   ```bash
+   mysql -u root -p lumor_puls < scripts/seed_tasks.sql
+   ```
+   监控源**只维护 MySQL `tasks` 表**，不在 `config.json` 里配置。
 2. **agent-browser**（PowerShell 不要用 `&&`）：
    ```powershell
    npm install -g agent-browser
@@ -26,11 +30,27 @@
 
 ## 配置
 
-编辑项目根目录 `config.json`：
+`config.json` 只放**运行时**配置（复制 `config.example.json`）：
 
-- `mysqlDsn`：MySQL 连接串
-- `seedTasks`：首次启动自动写入 `tasks` 表
-- `scheduler.enabled`：是否后台定时跑任务
+| 项 | 作用 |
+|----|------|
+| `mysqlDsn` | 数据库 |
+| `scheduler` | 是否常驻调度、`tickSec` |
+| `browser` | agent-browser 路径、本机 Chrome（`executablePath`） |
+| `llm` | DeepSeek/OpenAI 兼容 API |
+| `prompts.diffPath` | 变化提取 prompt |
+
+**监控哪些网站**：改 MySQL，例如：
+
+```sql
+INSERT INTO tasks (id, url, `interval`, type, enabled, created_at, updated_at)
+VALUES ('deepseek_news', 'https://www.deepseek.com/news', '12h', 'browser_snapshot', 1, NOW(), NOW());
+
+UPDATE tasks SET enabled = 0 WHERE id = 'techcrunch_ai';
+DELETE FROM tasks WHERE id = 'old_task';
+```
+
+也可直接编辑 `scripts/seed_tasks.sql` 后重新导入（`ON DUPLICATE KEY UPDATE`）。
 
 ## 运行
 

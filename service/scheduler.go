@@ -83,29 +83,6 @@ func (s *Scheduler) isDue(t *types.MonitorTask) bool {
 	return time.Since(*t.LastRunAt) >= d
 }
 
-// SeedFromConfig inserts seed tasks from config.
-func SeedFromConfig(dbDeps Deps) error {
-	cfg := dbDeps.Config
-	seeds := make([]types.MonitorTask, 0, len(cfg.SeedTasks))
-	for _, s := range cfg.SeedTasks {
-		seeds = append(seeds, types.MonitorTask{
-			ID:       s.ID,
-			URL:      s.URL,
-			Interval: s.Interval,
-			Type:     defaultTaskType(s.Type),
-			Enabled:  s.Enabled,
-		})
-	}
-	return NewStore(dbDeps.DB).SeedTasks(seeds)
-}
-
-func defaultTaskType(t string) string {
-	if t == "" {
-		return types.TaskTypeBrowserSnapshot
-	}
-	return t
-}
-
 // SchedulerEnabled reports whether scheduler should run.
 func SchedulerEnabled(cfg config.Config) bool {
 	return cfg.Scheduler.Enabled

@@ -28,9 +28,6 @@ func main() {
 	defer func() { _ = tools.CloseDB() }()
 
 	deps := service.Deps{DB: tools.DB(), Config: cfg}
-	if err := service.SeedFromConfig(deps); err != nil {
-		panic(fmt.Errorf("seed tasks: %w", err))
-	}
 
 	if *runOnce != "" {
 		p := service.NewPipeline(deps)
