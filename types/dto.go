@@ -21,3 +21,20 @@ type ExtractResult struct {
 	Changes []ExtractChange `json:"changes"`
 	Summary string          `json:"summary"`
 }
+
+// CreateTaskRequest is the body for POST /tasks.
+type CreateTaskRequest struct {
+	ID       string `json:"id"`
+	URL      string `json:"url"`
+	Interval string `json:"interval"`
+	Type     string `json:"type"`
+	Enabled  *bool  `json:"enabled"`
+}
+
+// UpdateTaskRequest is the body for PUT /tasks/:id (all fields optional).
+type UpdateTaskRequest struct {
+	URL      *string `json:"url"`
+	Interval *string `json:"interval"`
+	Type     *string `json:"type"`
+	Enabled  *bool   `json:"enabled"`
+}

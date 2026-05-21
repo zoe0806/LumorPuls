@@ -7,22 +7,25 @@ import (
 	"lumor_puls/service"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 // SetupRouter registers HTTP routes.
-func SetupRouter(db *gorm.DB, cfg config.Config) *gin.Engine {
+func SetupRouter(deps service.Deps, runner *service.Runner) *gin.Engine {
+	cfg := deps.Config
 	if cfg.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
-	deps := service.Deps{DB: db, Config: cfg}
-	h := NewHandler(deps)
+	h := NewHandler(deps, runner)
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
 	r.GET("/health", h.Health)
 	r.GET("/tasks", h.ListTasks)
+	r.GET("/tasks/:id", h.GetTask)
+	r.POST("/tasks", h.CreateTask)
+	r.PUT("/tasks/:id", h.UpdateTask)
+	r.DELETE("/tasks/:id", h.DeleteTask)
 	r.POST("/tasks/:id/run", h.RunTask)
 	r.GET("/signals", h.ListSignals)
 

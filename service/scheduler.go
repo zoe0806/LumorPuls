@@ -10,24 +10,24 @@ import (
 	"lumor_puls/types"
 )
 
-// Scheduler ticks and runs due monitor tasks.
+// Scheduler ticks and runs due monitor tasks (serial via Runner).
 type Scheduler struct {
-	deps     Deps
-	store    *Store
-	pipeline *Pipeline
-	tick     time.Duration
+	deps    Deps
+	store   *Store
+	runner  *Runner
+	tick    time.Duration
 }
 
-func NewScheduler(deps Deps) *Scheduler {
+func NewScheduler(deps Deps, runner *Runner) *Scheduler {
 	sec := deps.Config.Scheduler.TickSec
 	if sec <= 0 {
 		sec = 60
 	}
 	return &Scheduler{
-		deps:     deps,
-		store:    NewStore(deps.DB),
-		pipeline: NewPipeline(deps),
-		tick:     time.Duration(sec) * time.Second,
+		deps:   deps,
+		store:  NewStore(deps.DB),
+		runner: runner,
+		tick:   time.Duration(sec) * time.Second,
 	}
 }
 
@@ -56,18 +56,27 @@ func (s *Scheduler) tickOnce(ctx context.Context) {
 		log.Printf("scheduler: list tasks: %v", err)
 		return
 	}
+	var due []types.MonitorTask
 	for i := range tasks {
-		t := &tasks[i]
-		if !s.isDue(t) {
-			continue
+		if s.isDue(&tasks[i]) {
+			due = append(due, tasks[i])
 		}
-		tools.SafeGo(func() {
-			runCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
-			defer cancel()
-			if err := s.pipeline.RunTask(runCtx, t.ID); err != nil {
-				log.Printf("scheduler: task %s failed: %v", t.ID, err)
-			}
-		})
+	}
+	if len(due) == 0 {
+		return
+	}
+	log.Printf("scheduler: %d due task(s), running serially", len(due))
+	for i := range due {
+		if ctx.Err() != nil {
+			return
+		}
+		t := due[i]
+		runCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+		err := s.runner.RunTask(runCtx, t.ID)
+		cancel()
+		if err != nil {
+			log.Printf("scheduler: task %s failed: %v", t.ID, err)
+		}
 	}
 }
 

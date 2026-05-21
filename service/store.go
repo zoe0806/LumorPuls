@@ -32,6 +32,28 @@ func (s *Store) ListEnabledTasks() ([]types.MonitorTask, error) {
 	return list, err
 }
 
+// CreateTask inserts a new monitor task.
+func (s *Store) CreateTask(t *types.MonitorTask) error {
+	return s.db.Create(t).Error
+}
+
+// UpdateTask saves changes to an existing task.
+func (s *Store) UpdateTask(t *types.MonitorTask) error {
+	return s.db.Save(t).Error
+}
+
+// DeleteTask removes a task by id.
+func (s *Store) DeleteTask(id string) error {
+	res := s.db.Where("id = ?", id).Delete(&types.MonitorTask{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 // GetTask loads a task by id.
 func (s *Store) GetTask(id string) (*types.MonitorTask, error) {
 	var t types.MonitorTask

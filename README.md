@@ -72,10 +72,29 @@ go run . -run openai_pricing
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/health` | 健康检查 |
-| GET | `/tasks` | 任务列表 |
-| POST | `/tasks/:id/run` | 立即执行某任务 |
+| GET | `/tasks` | 任务列表（含 `lastRunAt`、`lastError`） |
+| GET | `/tasks/:id` | 单个任务 |
+| POST | `/tasks` | 新增任务 |
+| PUT | `/tasks/:id` | 更新 url / interval / enabled 等 |
+| DELETE | `/tasks/:id` | 删除任务 |
+| POST | `/tasks/:id/run` | 立即执行（与调度共用浏览器锁，串行） |
 | GET | `/signals` | 信号列表 |
 | GET | `/signals?type=pricing_change&task_id=openai_pricing&limit=20` | 过滤 |
+
+新增任务示例：
+
+```json
+POST /tasks
+{
+  "id": "deepseek_news",
+  "url": "https://www.deepseek.com/news",
+  "interval": "12h",
+  "type": "browser_snapshot",
+  "enabled": true
+}
+```
+
+调度器对到期任务**串行**执行，日志含 `pipeline: task=xxx step=...` 便于排查。
 
 ## 流程
 

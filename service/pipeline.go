@@ -46,12 +46,13 @@ func (p *Pipeline) RunTask(ctx context.Context, taskID string) error {
 }
 
 func (p *Pipeline) run(ctx context.Context, task *types.MonitorTask) error {
-	log.Printf("pipeline: start task=%s url=%s", task.ID, task.URL)
+	log.Printf("pipeline: task=%s step=capture url=%s", task.ID, task.URL)
 
 	cap, err := p.browser.Capture(ctx, task.ID, task.URL)
 	if err != nil {
-		return err
+		return fmt.Errorf("capture: %w", err)
 	}
+	log.Printf("pipeline: task=%s step=capture_done title=%q text_len=%d", task.ID, cap.Title, len(cap.Text))
 
 	hash := tools.ContentHash(cap.Text)
 	now := time.Now()
@@ -64,6 +65,7 @@ func (p *Pipeline) run(ctx context.Context, task *types.MonitorTask) error {
 		CapturedAt:  now,
 	}
 
+	log.Printf("pipeline: task=%s step=load_previous_snapshot", task.ID)
 	prev, err := p.store.LastSnapshot(task.ID)
 	if err != nil {
 		return err
@@ -72,19 +74,21 @@ func (p *Pipeline) run(ctx context.Context, task *types.MonitorTask) error {
 		if err := p.store.SaveSnapshot(cur); err != nil {
 			return err
 		}
-		log.Printf("pipeline: task=%s baseline snapshot saved", task.ID)
+		log.Printf("pipeline: task=%s step=baseline_saved hash=%s", task.ID, hash[:12])
 		return nil
 	}
 
 	if prev.ContentHash == hash {
-		log.Printf("pipeline: task=%s no content change", task.ID)
+		log.Printf("pipeline: task=%s step=unchanged hash=%s", task.ID, hash[:12])
 		return nil
 	}
 
+	log.Printf("pipeline: task=%s step=content_changed prev_hash=%s new_hash=%s", task.ID, prev.ContentHash[:12], hash[:12])
 	if err := p.store.SaveSnapshot(cur); err != nil {
 		return err
 	}
 
+	log.Printf("pipeline: task=%s step=llm_diff", task.ID)
 	result, err := p.extractor.Diff(ctx, *task, prev, cur)
 	if err != nil {
 		return fmt.Errorf("extract: %w", err)
@@ -92,14 +96,21 @@ func (p *Pipeline) run(ctx context.Context, task *types.MonitorTask) error {
 
 	rows := signalsFromExtract(task, cap.URL, result)
 	if len(rows) == 0 {
-		log.Printf("pipeline: task=%s no signals", task.ID)
+		log.Printf("pipeline: task=%s step=no_signals summary=%q", task.ID, resultSummary(result))
 		return nil
 	}
 	if err := p.store.InsertSignals(rows); err != nil {
 		return err
 	}
-	log.Printf("pipeline: task=%s saved %d signal(s)", task.ID, len(rows))
+	log.Printf("pipeline: task=%s step=signals_saved count=%d", task.ID, len(rows))
 	return nil
+}
+
+func resultSummary(r *types.ExtractResult) string {
+	if r == nil {
+		return ""
+	}
+	return r.Summary
 }
 
 func signalsFromExtract(task *types.MonitorTask, url string, r *types.ExtractResult) []types.Signal {

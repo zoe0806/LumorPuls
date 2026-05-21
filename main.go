@@ -28,12 +28,12 @@ func main() {
 	defer func() { _ = tools.CloseDB() }()
 
 	deps := service.Deps{DB: tools.DB(), Config: cfg}
+	runner := service.NewRunner(deps)
 
 	if *runOnce != "" {
-		p := service.NewPipeline(deps)
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 		defer cancel()
-		if err := p.RunTask(ctx, *runOnce); err != nil {
+		if err := runner.RunTask(ctx, *runOnce); err != nil {
 			log.Fatalf("run task %s: %v", *runOnce, err)
 		}
 		log.Printf("task %s finished", *runOnce)
@@ -44,11 +44,11 @@ func main() {
 	defer stop()
 
 	if service.SchedulerEnabled(cfg) {
-		sched := service.NewScheduler(deps)
+		sched := service.NewScheduler(deps, runner)
 		tools.SafeGo(func() { sched.Start(ctx) })
 	}
 
-	router := api.SetupRouter(tools.DB(), cfg)
+	router := api.SetupRouter(deps, runner)
 	addr := api.ListenAddr(cfg)
 	srv := &http.Server{
 		Addr:         addr,
