@@ -104,13 +104,16 @@ func (s *Store) InsertSignals(rows []types.Signal) error {
 }
 
 // ListSignals queries signals with optional filters.
-func (s *Store) ListSignals(signalType, taskID string, limit int) ([]types.Signal, error) {
+func (s *Store) ListSignals(signalType, signalCategory, taskID string, limit int) ([]types.Signal, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
 	q := s.db.Order("created_at DESC").Limit(limit)
 	if signalType != "" {
 		q = q.Where("signal_type = ?", signalType)
+	}
+	if signalCategory != "" {
+		q = q.Where("signal_category = ?", signalCategory)
 	}
 	if taskID != "" {
 		q = q.Where("task_id = ?", taskID)

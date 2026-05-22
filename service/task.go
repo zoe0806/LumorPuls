@@ -37,13 +37,18 @@ func CreateTask(store *Store, req types.CreateTaskRequest) (*types.MonitorTask, 
 	if req.Enabled != nil {
 		enabled = *req.Enabled
 	}
+	category, err := tools.NormalizeSignalCategory(req.SignalCategory)
+	if err != nil {
+		return nil, err
+	}
 
 	t := &types.MonitorTask{
-		ID:       id,
-		URL:      pageURL,
-		Interval: interval,
-		Type:     taskType,
-		Enabled:  enabled,
+		ID:             id,
+		URL:            pageURL,
+		Interval:       interval,
+		Type:           taskType,
+		SignalCategory: category,
+		Enabled:        enabled,
 	}
 	if err := store.CreateTask(t); err != nil {
 		return nil, err
@@ -86,6 +91,13 @@ func UpdateTask(store *Store, id string, req types.UpdateTaskRequest) (*types.Mo
 	}
 	if req.Enabled != nil {
 		t.Enabled = *req.Enabled
+	}
+	if req.SignalCategory != nil {
+		category, err := tools.NormalizeSignalCategory(*req.SignalCategory)
+		if err != nil {
+			return nil, err
+		}
+		t.SignalCategory = category
 	}
 	if err := store.UpdateTask(t); err != nil {
 		return nil, err

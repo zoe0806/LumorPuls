@@ -19,6 +19,6 @@
     "timeoutSec": 90
   },
   "prompts": {
-    "diffPath": "prompts/diff.txt"
+    "dir": "prompts"
   }
 }

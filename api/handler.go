@@ -79,7 +79,7 @@ func (h *Handler) UpdateTask(c *gin.Context) {
 		tools.Fail(c, http.StatusBadRequest, 400, err.Error())
 		return
 	}
-	if req.URL == nil && req.Interval == nil && req.Type == nil && req.Enabled == nil {
+	if req.URL == nil && req.Interval == nil && req.Type == nil && req.Enabled == nil && req.SignalCategory == nil {
 		tools.Fail(c, http.StatusBadRequest, 400, "no fields to update")
 		return
 	}
@@ -110,9 +110,13 @@ func (h *Handler) DeleteTask(c *gin.Context) {
 
 func (h *Handler) ListSignals(c *gin.Context) {
 	signalType := c.Query("type")
+	category := c.Query("category")
+	if category == "" {
+		category = c.Query("signal_category")
+	}
 	taskID := c.Query("task_id")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
-	list, err := h.store.ListSignals(signalType, taskID, limit)
+	list, err := h.store.ListSignals(signalType, category, taskID, limit)
 	if err != nil {
 		tools.Fail(c, http.StatusInternalServerError, 500, err.Error())
 		return

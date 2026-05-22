@@ -8,7 +8,7 @@
    ```bash
    mysql -u root -p lumor_puls < scripts/seed_tasks.sql
    ```
-   监控源**只维护 MySQL `tasks` 表**，不在 `config.json` 里配置。
+ 
 2. **agent-browser**（PowerShell 不要用 `&&`）：
    ```powershell
    npm install -g agent-browser
@@ -24,13 +24,13 @@
    agent-browser open https://example.com
    agent-browser close
    ```
-   若必须用 `install`，需可访问 `googlechromelabs.github.io` 或使用代理后再执行 `agent-browser install`。
+ 
 3. **LLM**：在 `config.json` 填 `llm.apiKey`，或环境变量 `LUMOR_LLM_API_KEY`
 4. **`browser.waitNetworkIdle`**：建议保持 `false`。OpenAI 等 SPA 用 `networkidle` 可能一直等不到结束。
 
 ## 配置
 
-`config.json` 只放**运行时**配置（复制 `config.example.json`）：
+
 
 | 项 | 作用 |
 |----|------|
@@ -38,13 +38,29 @@
 | `scheduler` | 是否常驻调度、`tickSec` |
 | `browser` | agent-browser 路径、本机 Chrome（`executablePath`） |
 | `llm` | DeepSeek/OpenAI 兼容 API |
-| `prompts.diffPath` | 变化提取 prompt |
+| `prompts.dir` | 分类 prompt 目录（`diff_pricing.txt` 等） |
+
+**已有库升级**（加 `signal_category` 列）：
+
+```bash
+mysql -u root -p lumor_puls < scripts/migrate_signal_category.sql
+```
+
+### Signal 分类（按 task 配置，分开执行 extractor）
+
+| `signal_category` | prompt | `payload` 示例 |
+|-------------------|--------|----------------|
+| `pricing` | `diff_pricing.txt` | `model`, `old_price`, `new_price` |
+| `release` | `diff_release.txt` | `product`, `version`, `breaking` |
+| `protocol` / `capability` / `ecosystem` | `diff_ecosystem.txt` | `type`, `old`, `new` |
+
+Task 仍管「去哪抓」；Signal 带 `category` + `payload`（JSON）。
 
 **监控哪些网站**：改 MySQL，例如：
 
 ```sql
-INSERT INTO tasks (id, url, `interval`, type, enabled, created_at, updated_at)
-VALUES ('deepseek_news', 'https://www.deepseek.com/news', '12h', 'browser_snapshot', 1, NOW(), NOW());
+INSERT INTO tasks (id, url, `interval`, type, signal_category, enabled, created_at, updated_at)
+VALUES ('deepseek_news', 'https://www.deepseek.com/news', '12h', 'browser_snapshot', 'ecosystem', 1, NOW(), NOW());
 
 UPDATE tasks SET enabled = 0 WHERE id = 'techcrunch_ai';
 DELETE FROM tasks WHERE id = 'old_task';
@@ -79,17 +95,18 @@ go run . -run openai_pricing
 | DELETE | `/tasks/:id` | 删除任务 |
 | POST | `/tasks/:id/run` | 立即执行（与调度共用浏览器锁，串行） |
 | GET | `/signals` | 信号列表 |
-| GET | `/signals?type=pricing_change&task_id=openai_pricing&limit=20` | 过滤 |
+| GET | `/signals?category=pricing&task_id=openai_pricing&limit=20` | 按分类过滤 |
+| GET | `/signals?type=pricing_change` | 按细类型过滤（兼容） |
 
 新增任务示例：
 
 ```json
 POST /tasks
 {
-  "id": "deepseek_news",
-  "url": "https://www.deepseek.com/news",
+  "id": "anthropic_pricing",
+  "url": "https://www.anthropic.com/pricing",
   "interval": "12h",
-  "type": "browser_snapshot",
+  "signalCategory": "pricing",
   "enabled": true
 }
 ```
@@ -99,5 +116,5 @@ POST /tasks
 ## 流程
 
 1. 首次运行：只保存 **baseline** snapshot，不产生 signal
-2. 再次运行：若 `content_hash` 不变则跳过；否则存新 snapshot 并调用 LLM diff
+2. 再次运行：若 `content_hash` 不变则跳过；否则按 `signal_category` 调用对应 extractor，写入带 `payload` 的 Signal
 3. 调度器按 `interval`（如 `6h`）与 `last_run_at` 判断是否 due

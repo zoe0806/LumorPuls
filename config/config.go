@@ -39,7 +39,7 @@ type LLMConfig struct {
 }
 
 type PromptsConfig struct {
-	DiffPath string `json:"diffPath"`
+	Dir string `json:"dir"`
 }
 
 var (

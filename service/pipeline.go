@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"lumor_puls/tools"
 	"lumor_puls/types"
 )
 
-// Pipeline runs capture → diff → persist for one task.
+// Pipeline runs capture → category extract → persist for one task.
 type Pipeline struct {
 	deps      Deps
 	store     *Store
@@ -46,7 +45,11 @@ func (p *Pipeline) RunTask(ctx context.Context, taskID string) error {
 }
 
 func (p *Pipeline) run(ctx context.Context, task *types.MonitorTask) error {
-	log.Printf("pipeline: task=%s step=capture url=%s", task.ID, task.URL)
+	category := task.SignalCategory
+	if category == "" {
+		category = types.SignalCategoryEcosystem
+	}
+	log.Printf("pipeline: task=%s category=%s step=capture url=%s", task.ID, category, task.URL)
 
 	cap, err := p.browser.Capture(ctx, task.ID, task.URL)
 	if err != nil {
@@ -74,84 +77,39 @@ func (p *Pipeline) run(ctx context.Context, task *types.MonitorTask) error {
 		if err := p.store.SaveSnapshot(cur); err != nil {
 			return err
 		}
-		log.Printf("pipeline: task=%s step=baseline_saved hash=%s", task.ID, hash[:12])
+		log.Printf("pipeline: task=%s step=baseline_saved hash=%s", task.ID, hashPrefix(hash))
 		return nil
 	}
 
 	if prev.ContentHash == hash {
-		log.Printf("pipeline: task=%s step=unchanged hash=%s", task.ID, hash[:12])
+		log.Printf("pipeline: task=%s step=unchanged hash=%s", task.ID, hashPrefix(hash))
 		return nil
 	}
 
-	log.Printf("pipeline: task=%s step=content_changed prev_hash=%s new_hash=%s", task.ID, prev.ContentHash[:12], hash[:12])
+	log.Printf("pipeline: task=%s step=content_changed prev=%s new=%s", task.ID, hashPrefix(prev.ContentHash), hashPrefix(hash))
 	if err := p.store.SaveSnapshot(cur); err != nil {
 		return err
 	}
 
-	log.Printf("pipeline: task=%s step=llm_diff", task.ID)
-	result, err := p.extractor.Diff(ctx, *task, prev, cur)
+	log.Printf("pipeline: task=%s step=extract category=%s", task.ID, category)
+	rows, err := p.extractor.Extract(ctx, *task, prev, cur)
 	if err != nil {
 		return fmt.Errorf("extract: %w", err)
 	}
-
-	rows := signalsFromExtract(task, cap.URL, result)
 	if len(rows) == 0 {
-		log.Printf("pipeline: task=%s step=no_signals summary=%q", task.ID, resultSummary(result))
+		log.Printf("pipeline: task=%s step=no_signals", task.ID)
 		return nil
 	}
 	if err := p.store.InsertSignals(rows); err != nil {
 		return err
 	}
-	log.Printf("pipeline: task=%s step=signals_saved count=%d", task.ID, len(rows))
+	log.Printf("pipeline: task=%s step=signals_saved count=%d category=%s", task.ID, len(rows), category)
 	return nil
 }
 
-func resultSummary(r *types.ExtractResult) string {
-	if r == nil {
-		return ""
+func hashPrefix(h string) string {
+	if len(h) >= 12 {
+		return h[:12]
 	}
-	return r.Summary
-}
-
-func signalsFromExtract(task *types.MonitorTask, url string, r *types.ExtractResult) []types.Signal {
-	if r == nil || len(r.Changes) == 0 {
-		if r != nil && strings.Contains(strings.ToLower(r.Summary), "no meaningful change") {
-			return nil
-		}
-		if r != nil && r.Summary != "" {
-			return []types.Signal{{
-				TaskID:     task.ID,
-				URL:        url,
-				SignalType: types.SignalTypeOther,
-				Summary:    r.Summary,
-				Severity:   types.SeverityLow,
-			}}
-		}
-		return nil
-	}
-	rows := make([]types.Signal, 0, len(r.Changes))
-	for _, c := range r.Changes {
-		st := c.Type
-		if st == "" {
-			st = types.SignalTypeOther
-		}
-		sev := c.Severity
-		if sev == "" {
-			sev = types.SeverityMedium
-		}
-		sum := r.Summary
-		if c.New != "" {
-			sum = strings.TrimSpace(c.Type + ": " + c.New)
-		}
-		rows = append(rows, types.Signal{
-			TaskID:     task.ID,
-			URL:        url,
-			SignalType: st,
-			Summary:    sum,
-			Severity:   sev,
-			OldExcerpt: c.Old,
-			NewExcerpt: c.New,
-		})
-	}
-	return rows
+	return h
 }
