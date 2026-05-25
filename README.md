@@ -75,6 +75,8 @@ go mod tidy
 go run . 
 ```
 
+浏览器打开 **http://localhost:8090/**（端口以 `config.json` 为准）可查看 Tasks / Signals 简易面板。
+
 手动跑一次任务（建基线或触发 diff）：
 
 ```bash

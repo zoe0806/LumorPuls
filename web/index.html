@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LumorPuls</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --border: #2d3a4f;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3b82f6;
+      --ok: #22c55e;
+      --warn: #eab308;
+      --err: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+    .sub { color: var(--muted); font-size: 0.85rem; }
+    main { padding: 1rem 1.5rem 2rem; max-width: 1200px; margin: 0 auto; }
+    .toolbar {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    button, select, input {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+    }
+    button { cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; }
+    .tab {
+      padding: 0.5rem 1rem;
+      border-radius: 6px 6px 0 0;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .tab.active {
+      background: var(--panel);
+      border-color: var(--border);
+      border-bottom-color: var(--panel);
+      color: var(--text);
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 0 8px 8px 8px;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td {
+      text-align: left;
+      padding: 0.5rem 0.6rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th { color: var(--muted); font-weight: 500; }
+    tr:hover td { background: rgba(59, 130, 246, 0.06); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .badge {
+      display: inline-block;
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .badge-pricing { background: #1e3a5f; color: #93c5fd; }
+    .badge-release { background: #3b2f1e; color: #fcd34d; }
+    .badge-ecosystem { background: #1e3b2f; color: #86efac; }
+    .badge-protocol { background: #3b1e4a; color: #e9d5ff; }
+    .badge-capability { background: #3b1e2a; color: #fda4af; }
+    .sev-high { color: var(--err); }
+    .sev-medium { color: var(--warn); }
+    .sev-low { color: var(--muted); }
+    .err-text { color: var(--err); font-size: 0.8rem; max-width: 200px; word-break: break-all; }
+    .signal-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .signal-card h3 { margin: 0 0 0.35rem; font-size: 0.95rem; }
+    .meta { color: var(--muted); font-size: 0.8rem; margin-bottom: 0.5rem; }
+    pre.payload {
+      margin: 0.5rem 0 0;
+      padding: 0.5rem;
+      background: var(--bg);
+      border-radius: 4px;
+      font-size: 0.75rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .hidden { display: none; }
+    #status { color: var(--muted); font-size: 0.8rem; }
+    .enabled-false { opacity: 0.55; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>LumorPuls</h1>
+      <div class="sub">AI 变化监控 · 任务与 Signal</div>
+    </div>
+    <div class="toolbar">
+      <span id="status">加载中…</span>
+      <button type="button" id="btnRefresh" class="primary">刷新</button>
+    </div>
+  </header>
+  <main>
+    <div class="tabs">
+      <button type="button" class="tab active" data-tab="signals">Signals</button>
+      <button type="button" class="tab" data-tab="tasks">Tasks</button>
+    </div>
+
+    <section id="panel-signals" class="panel">
+      <div class="toolbar">
+        <label>分类
+          <select id="filterCategory">
+            <option value="">全部</option>
+            <option value="pricing">pricing</option>
+            <option value="release">release</option>
+            <option value="protocol">protocol</option>
+            <option value="capability">capability</option>
+            <option value="ecosystem">ecosystem</option>
+          </select>
+        </label>
+        <label>任务
+          <input id="filterTaskId" placeholder="task_id" style="width:140px" />
+        </label>
+        <label>条数
+          <select id="filterLimit">
+            <option value="30">30</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+          </select>
+        </label>
+        <button type="button" id="btnLoadSignals">查询</button>
+      </div>
+      <div id="signalsList"></div>
+    </section>
+
+    <section id="panel-tasks" class="panel hidden">
+      <div id="tasksTable"></div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const $$ = (s) => document.querySelectorAll(s);
+
+    async function api(path, opts = {}) {
+      const res = await fetch(path, opts);
+      const json = await res.json();
+      if (!res.ok || json.code !== 0) {
+        throw new Error(json.message || res.statusText || 'request failed');
+      }
+      return json.data;
+    }
+
+    function fmtTime(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleString('zh-CN', { hour12: false });
+    }
+
+    function badgeCategory(cat) {
+      const c = (cat || 'ecosystem').toLowerCase();
+      return `<span class="badge badge-${c}">${c}</span>`;
+    }
+
+    function sevClass(s) {
+      if (s === 'high') return 'sev-high';
+      if (s === 'medium') return 'sev-medium';
+      return 'sev-low';
+    }
+
+    function parsePayload(raw) {
+      if (!raw) return null;
+      if (typeof raw === 'object') return raw;
+      try { return JSON.parse(raw); } catch { return { raw }; }
+    }
+
+    async function loadSignals() {
+      const params = new URLSearchParams();
+      const cat = $('#filterCategory').value;
+      const task = $('#filterTaskId').value.trim();
+      const limit = $('#filterLimit').value;
+      if (cat) params.set('category', cat);
+      if (task) params.set('task_id', task);
+      params.set('limit', limit);
+      const list = await api('/signals?' + params.toString());
+      const el = $('#signalsList');
+      if (!list.length) {
+        el.innerHTML = '<p class="sub">暂无 Signal</p>';
+        return;
+      }
+      el.innerHTML = list.map((s) => {
+        const payload = parsePayload(s.payload);
+        const payloadHtml = payload
+          ? `<pre class="payload">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`
+          : '';
+        return `<article class="signal-card">
+          <h3>${escapeHtml(s.summary || '(无摘要)')}</h3>
+          <div class="meta">
+            ${badgeCategory(s.category)}
+            <span class="${sevClass(s.severity)}">${s.severity || '—'}</span>
+            · <strong>${escapeHtml(s.taskId)}</strong>
+            · ${fmtTime(s.createdAt)}
+            ${s.type ? ' · ' + escapeHtml(s.type) : ''}
+          </div>
+          ${s.url ? `<div class="meta"><a href="${escapeAttr(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.url)}</a></div>` : ''}
+          ${(s.oldExcerpt || s.newExcerpt) ? `<div class="meta">${s.oldExcerpt ? '旧: ' + escapeHtml(s.oldExcerpt) : ''} ${s.newExcerpt ? ' → 新: ' + escapeHtml(s.newExcerpt) : ''}</div>` : ''}
+          ${payloadHtml}
+        </article>`;
+      }).join('');
+    }
+
+    async function loadTasks() {
+      const list = await api('/tasks');
+      const rows = list.map((t) => {
+        const err = t.lastError
+          ? `<div class="err-text" title="${escapeAttr(t.lastError)}">${escapeHtml(t.lastError.slice(0, 80))}${t.lastError.length > 80 ? '…' : ''}</div>`
+          : '—';
+        return `<tr class="${t.enabled ? '' : 'enabled-false'}">
+          <td><code>${escapeHtml(t.id)}</code></td>
+          <td>${badgeCategory(t.signalCategory)}</td>
+          <td>${t.interval}</td>
+          <td>${t.enabled ? '是' : '否'}</td>
+          <td>${fmtTime(t.lastRunAt)}</td>
+          <td>${err}</td>
+          <td><a href="${escapeAttr(t.url)}" target="_blank" rel="noopener">链接</a></td>
+          <td><button type="button" data-run="${escapeAttr(t.id)}" ${t.enabled ? '' : 'disabled'}>运行</button></td>
+        </tr>`;
+      }).join('');
+      $('#tasksTable').innerHTML = `<table>
+        <thead><tr>
+          <th>ID</th><th>分类</th><th>间隔</th><th>启用</th><th>上次运行</th><th>错误</th><th>URL</th><th></th>
+        </tr></thead>
+        <tbody>${rows || '<tr><td colspan="8">无任务</td></tr>'}</tbody>
+      </table>`;
+      $$('#tasksTable [data-run]').forEach((btn) => {
+        btn.addEventListener('click', () => runTask(btn.dataset.run));
+      });
+    }
+
+    async function runTask(id) {
+      setStatus('运行 ' + id + ' …');
+      try {
+        await api('/tasks/' + encodeURIComponent(id) + '/run', { method: 'POST' });
+        setStatus('完成: ' + id);
+        await refresh();
+      } catch (e) {
+        setStatus('失败: ' + e.message, true);
+      }
+    }
+
+    function escapeHtml(s) {
+      if (s == null) return '';
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function escapeAttr(s) { return escapeHtml(s).replace(/'/g,'&#39;'); }
+
+    function setStatus(msg, isErr) {
+      const el = $('#status');
+      el.textContent = msg;
+      el.style.color = isErr ? 'var(--err)' : 'var(--muted)';
+    }
+
+    function showTab(name) {
+      $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+      $('#panel-signals').classList.toggle('hidden', name !== 'signals');
+      $('#panel-tasks').classList.toggle('hidden', name !== 'tasks');
+    }
+
+    async function refresh() {
+      setStatus('刷新中…');
+      try {
+        await Promise.all([loadSignals(), loadTasks()]);
+        setStatus('已更新 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false }));
+      } catch (e) {
+        setStatus('错误: ' + e.message, true);
+      }
+    }
+
+    $$('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
+    $('#btnRefresh').addEventListener('click', refresh);
+    $('#btnLoadSignals').addEventListener('click', loadSignals);
+    refresh();
+    setInterval(refresh, 60000);
+  </script>
+</body>
+</html>

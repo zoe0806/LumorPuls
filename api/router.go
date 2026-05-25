@@ -20,6 +20,8 @@ func SetupRouter(deps service.Deps, runner *service.Runner) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
+	registerWeb(r)
+
 	r.GET("/health", h.Health)
 	r.GET("/tasks", h.ListTasks)
 	r.GET("/tasks/:id", h.GetTask)
