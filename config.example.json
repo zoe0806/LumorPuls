@@ -9,7 +9,8 @@
   "browser": {
     "bin": "agent-browser",
     "executablePath": "",
-    "timeoutSec": 120,
+    "sessionName": "lumor_worker",
+    "timeoutSec": 300,
     "waitNetworkIdle": false
   },
   "llm": {

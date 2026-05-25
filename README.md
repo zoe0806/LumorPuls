@@ -83,7 +83,20 @@ go run .
 go run . -run openai_pricing
 ```
 
-**正常耗时**：已完成 `agent-browser install` 时，单次任务一般 **30 秒～2 分钟**（首次只建基线，不调 LLM）。超过 5 分钟多半卡在浏览器，按 `Ctrl+C` 中断后检查上面第 2 步。
+**正常耗时**：单次任务一般 **30 秒～2 分钟**（首次只建基线，不调 LLM）。
+
+### 报错 `Could not configure browser` / `os error 10060`
+
+通常是 **本机堆了太多 agent-browser 守护进程**（旧版每个 task 一个 `lumor_<id>` session），CDP 连不上。
+
+1. 停掉 `go run .`（Ctrl+C）
+2. PowerShell 执行清理脚本（会关掉所有 Chrome）：
+   ```powershell
+   .\scripts\kill_browser.ps1
+   ```
+3. 重新启动 `go run .`，再试 `POST /tasks/openai_pricing/run`
+
+当前版本已改为 **所有任务共用一个 session**（`browser.sessionName`: `lumor_worker`），避免再堆积。`agent-browser doctor` 可查看是否还有大量 `lumor_*` session。
 
 ## API
 

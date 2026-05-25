@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -10,6 +11,7 @@ import (
 // registerWeb serves the dashboard at GET / and /dashboard.
 func registerWeb(r *gin.Engine) {
 	dir := webDir()
+	fmt.Println("dir", dir)
 	r.GET("/", func(c *gin.Context) {
 		c.File(filepath.Join(dir, "index.html"))
 	})

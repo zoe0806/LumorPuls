@@ -24,17 +24,19 @@ func NewBrowser(cfg config.BrowserConfig) *Browser {
 	return &Browser{cfg: cfg}
 }
 
+const defaultBrowserSession = "lumor_worker"
+
 // Capture opens url, waits for load, extracts title/url/text, then closes session.
+// All tasks share one browser session (Runner already serializes) to avoid many Chrome daemons on Windows.
 func (b *Browser) Capture(ctx context.Context, taskID, url string) (*types.CaptureResult, error) {
-	session := "lumor_" + taskID
-	timeout := time.Duration(b.cfg.TimeoutSec) * time.Second
-	if timeout <= 0 {
-		timeout = 120 * time.Second
-	}
-	runCtx, cancel := context.WithTimeout(ctx, timeout)
+	session := b.sessionName()
+	runCtx, cancel, budget := b.captureContext(ctx)
 	defer cancel()
 
-	log.Printf("browser: open session=%s url=%s (timeout=%s)", session, url, timeout)
+	// Reset stale daemon/socket from a previous crash or per-task sessions.
+	_ = b.run(context.Background(), session, "close")
+
+	log.Printf("browser: open session=%s task=%s url=%s (budget=%s)", session, taskID, url, budget)
 	if err := b.run(runCtx, session, "open", url); err != nil {
 		return nil, fmt.Errorf("open: %w", err)
 	}
@@ -167,7 +169,36 @@ func normalizeText(s string) string {
 	return strings.TrimSpace(s)
 }
 
-// browserEnv passes AGENT_BROWSER_EXECUTABLE_PATH so install can be skipped when using system Chrome.
+// captureContext builds a timeout that is not shorter than the parent when parent allows more time.
+// Fixes: open alone can exceed 120s on Windows; a fixed 120s cap caused eval to hit deadline exceeded.
+func (b *Browser) captureContext(ctx context.Context) (context.Context, context.CancelFunc, time.Duration) {
+	cfgSec := b.cfg.TimeoutSec
+	if cfgSec <= 0 {
+		cfgSec = 300
+	}
+	budget := time.Duration(cfgSec) * time.Second
+	const floor = 5 * time.Minute
+	if budget < floor {
+		budget = floor
+	}
+	if dl, ok := ctx.Deadline(); ok {
+		remaining := time.Until(dl)
+		if remaining > 0 && remaining > budget {
+			budget = remaining
+		}
+	}
+	c, cancel := context.WithTimeout(ctx, budget)
+	return c, cancel, budget
+}
+
+func (b *Browser) sessionName() string {
+	if s := strings.TrimSpace(b.cfg.SessionName); s != "" {
+		return s
+	}
+	return defaultBrowserSession
+}
+
+// browserEnv passes browser-related env vars to agent-browser CLI.
 func browserEnv(cfg config.BrowserConfig) []string {
 	env := os.Environ()
 	path := cfg.ExecutablePath
@@ -177,5 +208,29 @@ func browserEnv(cfg config.BrowserConfig) []string {
 	if path != "" {
 		env = append(env, "AGENT_BROWSER_EXECUTABLE_PATH="+path)
 	}
+	// Shut down idle daemon so sessions do not accumulate after each task.
+	env = append(env, "AGENT_BROWSER_IDLE_TIMEOUT_MS=120000")
 	return env
+}
+
+// CloseAllSessions runs agent-browser close --all (use when repairing stuck daemons).
+func CloseAllSessions(cfg config.BrowserConfig) error {
+	bin := cfg.Bin
+	if bin == "" {
+		bin = "agent-browser"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, "close", "--all")
+	cmd.Env = browserEnv(cfg)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg != "" {
+			return fmt.Errorf("%w: %s", err, msg)
+		}
+		return err
+	}
+	return nil
 }
